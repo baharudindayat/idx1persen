@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDX Shareholder Intelligence · Notion</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Lora:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root{--bg:#ffffff;--surface:#f7f6f3;--surface2:#efefed;--border:#e3e2e0;--accent:#2e75cc;--accent2:#e16259;--accent3:#9b7ec8;--accent4:#448361;--text:#37352f;--muted:#9b9a97;--gold:#cb912f;--notion-red:#e16259;--notion-blue:#2e75cc;--notion-green:#448361;--notion-purple:#9b7ec8;--notion-orange:#d9730d;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:none;pointer-events:none;z-index:0;}
+
+/* LOADING */
+#loadingOverlay{position:fixed;inset:0;background:#fff;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;}
+.loader-title{font-family:'Lora',serif;font-size:26px;font-weight:600;color:var(--text);}
+.loader-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;}
+.progress-bar{width:340px;height:3px;background:var(--border);position:relative;overflow:hidden;}
+.progress-fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);width:0%;transition:width 0.25s ease;border-radius:3px;}
+.loader-stats{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
+.dot-anim span{animation:blink 1.2s infinite;opacity:0;}
+.dot-anim span:nth-child(2){animation-delay:.2s;}.dot-anim span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
+
+/* HEADER */
+header{position:relative;z-index:10;padding:14px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.97);backdrop-filter:blur(8px);}
+.logo{display:flex;align-items:center;gap:14px;}
+.logo-icon{width:42px;height:42px;border:2px solid var(--accent);display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);position:relative;}
+.logo-icon::after{display:none;}
+.logo-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:17px;font-weight:700;color:var(--text);}
+.logo-sub{font-size:11px;color:var(--muted);font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:0;text-transform:none;}
+.header-meta{display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+.meta-pill{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 10px;border:1px solid var(--border);color:var(--muted);border-radius:4px;background:var(--surface);}
+.meta-pill span{color:var(--accent);}
+.upload-label{display:flex;align-items:center;gap:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;padding:6px 14px;border:1px solid var(--border);color:var(--text);cursor:pointer;transition:all .2s;border-radius:6px;background:var(--surface);font-weight:500;}
+.upload-label:hover{background:var(--surface2);}
+.upload-label .dot{width:7px;height:7px;border-radius:50%;background:var(--accent4);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+input[type=file]{display:none;}
+
+/* PERF BAR */
+.perf-bar{display:none;background:var(--surface);border-bottom:1px solid var(--border);padding:5px 32px;display:none;gap:12px;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+.perf-badge{padding:2px 8px;border:1px solid var(--border);font-size:9px;border-radius:3px;}
+.perf-badge.g{border-color:var(--accent4);color:var(--accent4);border-radius:3px;}
+.perf-badge.b{border-color:var(--accent);color:var(--accent);border-radius:3px;}
+
+/* SEARCH */
+.search-section{position:relative;z-index:10;padding:14px 32px;background:var(--bg);border-bottom:1px solid var(--border);}
+.search-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.search-label .rs{color:var(--muted);font-size:9px;}
+.debounce-ind{color:var(--accent);opacity:0;transition:opacity .2s;font-size:9px;}
+.debounce-ind.on{opacity:1;}
+.search-row{display:flex;gap:10px;flex-wrap:wrap;}
+.search-box{position:relative;flex:2;min-width:200px;}
+.search-box input,.filter-select{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 14px 10px 40px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;transition:border-color .2s;}
+.search-box input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(46,117,204,.12);}
+.search-box::before{content:'⌕';position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:20px;pointer-events:none;}
+.filter-select{padding-left:11px;min-width:150px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;}
+.filter-select:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(46,117,204,.12);outline:none;}
+.filter-select option{background:#fff;color:var(--text);}
+.btn-reset{background:transparent;border:1px solid var(--border);color:var(--muted);padding:8px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;border-radius:6px;}
+.btn-reset:hover{background:var(--surface2);color:var(--text);border-color:var(--muted);}
+
+/* LAYOUT */
+main{position:relative;z-index:5;padding:24px 32px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.kpi-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);gap:13px;}
+.kpi{background:var(--bg);border:1px solid var(--border);padding:16px;position:relative;overflow:hidden;transition:all .15s;border-radius:8px;}
+.kpi:hover{border-color:var(--muted);box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kpi-color,var(--accent));border-radius:8px 8px 0 0;}
+.kpi-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);margin-bottom:6px;}
+.kpi-value{font-family:'Lora',serif;font-size:26px;font-weight:600;color:var(--kpi-color,var(--accent));line-height:1;margin-bottom:3px;}
+.kpi-sub{font-size:11px;color:var(--muted);font-family:'Plus Jakarta Sans',sans-serif;}
+.kpi-value-sm{font-family:'Lora',serif;font-size:17px;font-weight:600;color:var(--kpi-color,var(--accent));line-height:1.2;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* FUN FACTS */
+.funfacts-strip{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+.funfact{background:var(--bg);border:1px solid var(--border);padding:14px 16px 14px 20px;position:relative;overflow:hidden;transition:all .15s;border-radius:8px;}
+.funfact:hover{border-color:var(--muted);box-shadow:0 2px 8px rgba(0,0,0,.05);}
+.funfact::before{content:'';position:absolute;top:0;left:0;bottom:0;width:4px;background:var(--ff-color,var(--accent));border-radius:8px 0 0 8px;}
+.funfact-icon{font-size:18px;margin-bottom:6px;line-height:1;}
+.funfact-label{font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);margin-bottom:4px;}
+.funfact-value{font-family:'Lora',serif;font-size:15px;font-weight:600;color:var(--ff-color,var(--accent));margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.funfact-desc{font-size:11px;color:var(--muted);line-height:1.45;font-family:'Plus Jakarta Sans',sans-serif;}
+
+.ticker-strip{grid-column:1/-1;background:var(--surface);border:1px solid var(--border);padding:8px 16px;display:flex;gap:24px;overflow-x:auto;border-radius:8px;}
+.ticker-item{display:flex;align-items:center;gap:8px;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:11px;}
+.ticker-code{color:var(--gold);font-weight:600;}
+.ticker-pct{color:var(--accent4);font-weight:600;}
+.panel{background:var(--bg);border:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;border-radius:8px;}
+.panel-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);}
+.panel-title{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text);white-space:nowrap;}
+.panel-count{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+.table-panel{grid-column:1/-1;}
+.vscroll-wrap{overflow-y:auto;overflow-x:auto;max-height:420px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{background:var(--surface);padding:8px 12px;text-align:left;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted);position:sticky;top:0;z-index:2;cursor:pointer;white-space:nowrap;user-select:none;border-bottom:1px solid var(--border);}
+thead th:hover{color:var(--accent);background:var(--surface2);}
+thead th.sorted-asc::after{content:' ↑';color:var(--accent);}
+thead th.sorted-desc::after{content:' ↓';color:var(--accent);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:hover{background:var(--surface);}
+tbody td{padding:8px 12px;}
+.badge{display:inline-block;padding:2px 7px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;font-weight:700;text-transform:uppercase;}
+.badge-default{background:rgba(100,116,139,.15);color:var(--muted);}
+.pct-bar-cell{display:flex;align-items:center;gap:6px;}
+.pct-bar{flex:1;height:3px;background:var(--border);max-width:65px;position:relative;overflow:hidden;}
+.pct-fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);}
+.pct-num{color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:40px;}
+.num-cell{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);}
+.stock-code{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--notion-orange);font-size:12px;}
+.issuer-name,.investor-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;display:inline-block;}
+.local-badge{background:rgba(122,184,122,.12);color:#7ab87a;padding:2px 5px;font-size:9px;font-family:'IBM Plex Mono',monospace;border:1px solid rgba(122,184,122,.2);}
+.foreign-badge{background:rgba(196,122,58,.12);color:#c47a3a;padding:2px 5px;font-size:9px;font-family:'IBM Plex Mono',monospace;border:1px solid rgba(196,122,58,.2);}
+.pagination{display:flex;align-items:center;gap:5px;padding:10px 16px;border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:11px;flex-wrap:wrap;}
+.page-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:4px 9px;cursor:pointer;transition:all .15s;font-family:'IBM Plex Mono',monospace;font-size:11px;border-radius:4px;}
+.page-btn:hover,.page-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(46,117,204,.06);}
+.page-btn:disabled{opacity:.3;cursor:not-allowed;}
+.page-info{color:var(--muted);margin-left:auto;}
+.chart-panel{min-height:265px;}
+.chart-wrap{padding:13px;flex:1;position:relative;}
+.top-investor-row{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);gap:10px;}
+.rank-num{font-family:'Lora',serif;font-size:16px;color:var(--border);min-width:22px;font-weight:600;}
+.rank-num.top3{color:var(--gold);}
+.inv-info{flex:1;min-width:0;}
+.inv-name{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.inv-meta{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+.inv-pct{font-family:'Lora',serif;font-size:17px;color:var(--accent);font-weight:600;}
+.nat-row{display:flex;align-items:center;padding:8px 14px;gap:10px;border-bottom:1px solid var(--border);}
+.nat-flag{font-size:17px;}
+.nat-name{flex:1;font-size:12px;}
+.nat-count-bar{width:65px;height:3px;background:var(--border);position:relative;overflow:hidden;}
+.nat-count-fill{position:absolute;left:0;top:0;bottom:0;}
+.nat-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);min-width:26px;text-align:right;}
+/* Bubble */
+.bubble-circle{cursor:pointer;transition:opacity .2s,filter .2s;}
+.bubble-circle:hover{opacity:1!important;filter:brightness(1.35) drop-shadow(0 0 8px currentColor);}
+.bubble-axis-label{font-family:'IBM Plex Mono',monospace;font-size:10px;fill:#9b9a97;}
+.bubble-grid{stroke:#e3e2e0;stroke-width:.5;stroke-dasharray:4,4;}
+.bubble-legend-item{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9b9a97;}
+.bubble-legend-dot{width:9px;height:9px;border-radius:50%;}
+/* Graphs */
+.rel-wrap{width:100%;flex:1;position:relative;overflow:hidden;}
+.rel-wrap svg{width:100%;height:100%;}
+.rel-link{stroke-opacity:.5;}
+.rel-tooltip{position:fixed;display:none;background:#fff;border:1px solid #e3e2e0;padding:10px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);pointer-events:none;z-index:999;max-width:240px;line-height:1.7;box-shadow:0 4px 24px rgba(0,0,0,.12);border-radius:6px;}
+.map-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.map-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:4px 10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;border-radius:4px;}
+.map-btn:hover,.map-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(46,117,204,.06);}
+.sh-legend{display:flex;gap:13px;flex-wrap:wrap;padding:0 17px 12px;}
+.sh-legend-item{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+.sh-legend-dot{width:9px;height:9px;border-radius:50%;}
+mark{background:rgba(46,117,204,.12);color:var(--accent);border-radius:2px;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--surface);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+::-webkit-scrollbar-thumb:hover{background:var(--muted);}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.panel,.kpi{animation:fadeUp .4s ease both;}
+.kpi:nth-child(1){animation-delay:.04s}.kpi:nth-child(2){animation-delay:.08s}.kpi:nth-child(3){animation-delay:.12s}.kpi:nth-child(4){animation-delay:.16s}.kpi:nth-child(5){animation-delay:.20s}
+@media(max-width:1100px){main{grid-template-columns:1fr 1fr;}.kpi-row{grid-template-columns:repeat(3,1fr);}.funfacts-strip{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:700px){main{grid-template-columns:1fr;padding:13px;}.kpi-row{grid-template-columns:1fr 1fr;}.funfacts-strip{grid-template-columns:1fr 1fr;}header{flex-direction:column;gap:12px;}.search-row{flex-direction:column;}}
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="loader-title" style="font-family:'Lora',serif;font-weight:600;color:var(--text);font-size:26px;">IDX Shareholder Intelligence</div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="loader-stats" id="loaderStats">Initializing<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
+  <div class="loader-sub">LOADING · PARSING · INDEXING</div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">IDX</div>
+    <div>
+      <div class="logo-title">Shareholder Intelligence</div>
+      <div class="logo-sub">Indonesia Stock Exchange · Ownership Analytics</div>
+    </div>
+  </div>
+  <div class="header-meta">
+    <div class="meta-pill" id="datePill">DATE <span>—</span></div>
+    <div class="meta-pill">RECORDS <span id="totalPill">—</span></div>
+    <div class="meta-pill">STATUS <span style="color:var(--accent4)">● LIVE</span></div>
+    <label class="upload-label" title="Upload shareholders-data.json">
+      <div class="dot"></div>
+      <span id="dsLabel">shareholders-data.json</span>
+      <input type="file" id="fileUpload" accept=".json">
+    </label>
+  </div>
+</header>
+
+<div id="perfBar" class="perf-bar">
+  <span class="perf-badge g" id="perfLoad">LOAD: —</span>
+  <span class="perf-badge b" id="perfFilter">FILTER: —</span>
+  <span class="perf-badge b" id="perfRender">RENDER: —</span>
+  <span class="perf-badge" id="perfRows">ROWS: —</span>
+  <span style="margin-left:auto;font-size:9px">Debounce 220ms · Charts sampled · Graphs capped · Index-accelerated filters</span>
+</div>
+
+<div class="search-section">
+  <div class="search-label">
+    Filter &amp; Search
+    <span class="rs" id="filteredCount"></span>
+    <span class="debounce-ind" id="debInd">● searching…</span>
+  </div>
+  <div class="search-row">
+    <div class="search-box" style="flex:2">
+      <input type="text" id="searchInput" placeholder="Search issuer, investor, stock code, nationality…" autocomplete="off">
+    </div>
+    <select class="filter-select" id="filterCode"><option value="">All Stock Codes</option></select>
+    <select class="filter-select" id="filterType"><option value="">All Investor Types</option></select>
+    <select class="filter-select" id="filterLF">
+      <option value="">Local / Foreign</option>
+      <option value="LOCAL">LOCAL</option>
+      <option value="FOREIGN">FOREIGN</option>
+    </select>
+    <select class="filter-select" id="filterNat"><option value="">All Nationalities</option></select>
+    <select class="filter-select" id="filterInvestor" style="min-width:200px"><option value="">All Investors</option></select>
+    <select class="filter-select" id="sortBy">
+      <option value="">Sort by…</option>
+      <option value="pct_desc">% Holding ↓</option>
+      <option value="pct_asc">% Holding ↑</option>
+      <option value="shares_desc">Total Shares ↓</option>
+      <option value="shares_asc">Total Shares ↑</option>
+      <option value="code_asc">Stock Code A→Z</option>
+      <option value="investor_asc">Investor A→Z</option>
+    </select>
+    <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
+  </div>
+</div>
+
+<main>
+  <!-- KPI ROW 1 -->
+  <div class="kpi-row">
+    <div class="kpi" style="--kpi-color:var(--accent)"><div class="kpi-label">Filtered Records</div><div class="kpi-value" id="kpiRecords">—</div><div class="kpi-sub">of <span id="kpiTotal">—</span> total</div></div>
+    <div class="kpi" style="--kpi-color:var(--gold)"><div class="kpi-label">Unique Issuers</div><div class="kpi-value" id="kpiIssuers">—</div><div class="kpi-sub">listed companies</div></div>
+    <div class="kpi" style="--kpi-color:var(--accent4)"><div class="kpi-label">Unique Investors</div><div class="kpi-value" id="kpiInvestors">—</div><div class="kpi-sub">distinct holders</div></div>
+    <div class="kpi" style="--kpi-color:var(--accent2)"><div class="kpi-label">Avg % Holding</div><div class="kpi-value" id="kpiAvgPct">—</div><div class="kpi-sub">per stakeholder</div></div>
+    <div class="kpi" style="--kpi-color:var(--accent3)"><div class="kpi-label">Highest Stake</div><div class="kpi-value" id="kpiTop">—</div><div class="kpi-sub" id="kpiTopSub">—</div></div>
+  </div>
+  <!-- KPI ROW 2: volumes & distribution -->
+  <div class="kpi-row">
+    <div class="kpi" style="--kpi-color:var(--accent)"><div class="kpi-label">Total Shares (filtered)</div><div class="kpi-value kpi-value-sm" id="kpiTotalShares">—</div><div class="kpi-sub">scripless + scrip</div></div>
+    <div class="kpi" style="--kpi-color:var(--gold)"><div class="kpi-label">Total % Holdings Sum</div><div class="kpi-value" id="kpiTotalPct">—</div><div class="kpi-sub" id="kpiTotalPctSub">across all positions</div></div>
+    <div class="kpi" style="--kpi-color:var(--accent4)"><div class="kpi-label">Largest Issuer</div><div class="kpi-value kpi-value-sm" id="kpiTopIssuer">—</div><div class="kpi-sub" id="kpiTopIssuerSub">by no. of shareholders</div></div>
+    <div class="kpi" style="--kpi-color:var(--accent2)"><div class="kpi-label">Top Nationality</div><div class="kpi-value kpi-value-sm" id="kpiTopNat">—</div><div class="kpi-sub" id="kpiTopNatSub">most frequent origin</div></div>
+    <div class="kpi" style="--kpi-color:var(--accent3)"><div class="kpi-label">Foreign Concentration</div><div class="kpi-value" id="kpiForeignPct">—</div><div class="kpi-sub" id="kpiForeignSub">of all holdings by %</div></div>
+  </div>
+  <!-- FUN FACTS STRIP -->
+  <div style="grid-column:1/-1;margin-bottom:-4px;display:flex;align-items:center;gap:10px;"><span style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:var(--text)">Key Insights</span><span style="font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace">free float · concentration · cross-ownership · market structure</span></div><div class="funfacts-strip" id="funfactsStrip"></div>
+
+  <div class="ticker-strip" id="tickerStrip"></div>
+
+  <div class="panel table-panel">
+    <div class="panel-header">
+      <span class="panel-title">Shareholder Registry</span>
+      <span class="panel-count" id="tableCount">0 records</span>
+    </div>
+    <div class="vscroll-wrap">
+      <table>
+        <thead><tr>
+          <th onclick="sortTable('code')">Code</th>
+          <th onclick="sortTable('issuer')">Issuer</th>
+          <th onclick="sortTable('investor')">Investor</th>
+          <th onclick="sortTable('type')">Type</th>
+          <th onclick="sortTable('lf')">L/F</th>
+          <th onclick="sortTable('nationality')">Nationality</th>
+          <th onclick="sortTable('scripless')">Scripless</th>
+          <th onclick="sortTable('script')">Script</th>
+          <th onclick="sortTable('total')">Total Shares</th>
+          <th onclick="sortTable('pct')">% Hold</th>
+        </tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <div class="panel chart-panel"><div class="panel-header"><span class="panel-title">Investor Type Breakdown</span></div><div class="chart-wrap"><canvas id="typeChart"></canvas></div></div>
+  <div class="panel chart-panel"><div class="panel-header"><span class="panel-title">Nationality Distribution</span></div><div style="padding:0;flex:1;overflow-y:auto;max-height:265px;" id="natPanel"></div></div>
+  <div class="panel chart-panel"><div class="panel-header"><span class="panel-title">Holdings Concentration</span></div><div class="chart-wrap"><canvas id="holdingsChart"></canvas></div></div>
+  <div class="panel chart-panel"><div class="panel-header"><span class="panel-title">Top 10 Stakes</span></div><div style="flex:1;overflow-y:auto;max-height:265px;" id="topInvestors"></div></div>
+  <div class="panel chart-panel"><div class="panel-header"><span class="panel-title">Local vs Foreign</span></div><div class="chart-wrap"><canvas id="lfChart"></canvas></div></div>
+  <div class="panel chart-panel"><div class="panel-header"><span class="panel-title">Ownership per Stock (Top 30)</span></div><div class="chart-wrap"><canvas id="stockChart"></canvas></div></div>
+
+  <!-- BUBBLE MAP -->
+  <div class="panel" style="grid-column:1/-1;min-height:440px;">
+    <div class="panel-header">
+      <span class="panel-title">Bubble Map · Investor × Stock × % Holding</span>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)">X=stock · Y=% · SIZE=shares · COLOR=type · (top 200 by %)</span>
+        <select class="filter-select" id="bubbleMode" onchange="renderBubbleMap()" style="min-width:130px;padding:5px 28px 5px 10px;font-size:10px;"><option value="all">All Stocks</option></select>
+      </div>
+    </div>
+    <div style="padding:15px 21px 18px;flex:1;position:relative;">
+      <div id="bubbleMapWrap" style="width:100%;height:350px;background:#fafafa;border-radius:4px;"></div>
+      <div id="bubbleTooltip" class="rel-tooltip" style="border-color:var(--accent);max-width:260px;"></div>
+    </div>
+    <div style="padding:0 21px 13px;display:flex;gap:16px;flex-wrap:wrap;" id="bubbleLegend"></div>
+  </div>
+
+  <!-- RELATIONSHIP MAP -->
+  <div class="panel" style="grid-column:1/-1;min-height:520px;">
+    <div class="panel-header">
+      <span class="panel-title">Relationship Map · Investor → Stock</span>
+      <div class="map-controls">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)">drag · hover · scroll=zoom · top 300 by %</span>
+        <button class="map-btn active" onclick="setRelFilter('all',this)">ALL</button>
+        <button class="map-btn" onclick="setRelFilter('LOCAL',this)">LOCAL</button>
+        <button class="map-btn" onclick="setRelFilter('FOREIGN',this)">FOREIGN</button>
+        <button class="map-btn" onclick="resetRelZoom()">↺ RESET</button>
+      </div>
+    </div>
+    <div class="rel-wrap" id="relMapWrap" style="height:440px;background:#fafafa;border-radius:0 0 8px 8px;"></div>
+    <div class="sh-legend" id="relMapLegend"></div>
+    <div class="rel-tooltip" id="relTooltip"></div>
+  </div>
+
+  <!-- SHAREHOLDERS RELATIONSHIP MAP -->
+  <div class="panel" style="grid-column:1/-1;min-height:520px;">
+    <div class="panel-header">
+      <span class="panel-title">Shareholder Network · Co-Ownership</span>
+      <div class="map-controls">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)">investors linked by shared stock · line weight = combined % · top 300</span>
+        <select class="filter-select" id="shStockFilter" onchange="renderShareholderMap()" style="min-width:130px;padding:5px 28px 5px 10px;font-size:10px;"><option value="all">All Stocks</option></select>
+        <button class="map-btn" onclick="resetSHZoom()">↺ RESET</button>
+      </div>
+    </div>
+    <div class="rel-wrap" id="shMapWrap" style="height:440px;background:#fafafa;border-radius:0 0 8px 8px;"></div>
+    <div class="sh-legend" id="shLegend"></div>
+    <div class="rel-tooltip" id="shTooltip"></div>
+  </div>
+</main>
+
+<script>
+'use strict';
+// ── CONFIG ──────────────────────────────────────────────
+const DATA_URL    = 'https://raw.githubusercontent.com/baharudindayat/idx1persen/refs/heads/main/shareholders-data.json'; // path ke file JSON Anda
+const PER_PAGE    = 50;    // rows per page
+const CHART_SMPL  = 2000;   // max records sampled for charts
+const GRAPH_CAP   = 2000;   // max nodes for force graphs
+const BUBBLE_CAP  = 1000;    // max bubbles in bubble map
+
+// ── DYNAMIC COLOR & FLAG PALETTE ────────────────────────
+// Generated from data in buildIndexes() — no hardcoded constants
+const TYPE_PALETTE = ['#7ab87a','#d4a853','#9b7d5a','#da8a4e','#c47a3a','#f87171','#38bdf8','#fb923c','#a3e635','#e879f9'];
+const FALLBACK_COLOR = '#907e6e';
+
+// Nationality → unicode flag via ISO 3166 region code lookup
+// Derived purely from the NATIONALITY strings found in the data
+function nationalityToFlag(nat) {
+  if(!nat) return '🌐';
+  const n = nat.toUpperCase();
+  // Map common name patterns to ISO 3166-1 alpha-2 for flag emoji
+  const ISO = {
+    'INDONESIA':'ID','INDONESIAN':'ID',
+    'MALAYSIA':'MY','MALAYSIAN':'MY',
+    'SINGAPORE':'SG','SINGAPOREAN':'SG',
+    'JAPAN':'JP','JAPANESE':'JP',
+    'CHINA':'CN','CHINESE':'CN',
+    'HONG KONG':'HK',
+    'SOUTH KOREA':'KR','KOREA':'KR',
+    'UNITED STATES':'US','AMERICAN':'US','USA':'US','US':'US',
+    'UNITED KINGDOM':'GB','BRITISH':'GB','UK':'GB',
+    'AUSTRALIA':'AU','AUSTRALIAN':'AU',
+    'NETHERLANDS':'NL','DUTCH':'NL',
+    'GERMANY':'DE','GERMAN':'DE',
+    'FRANCE':'FR','FRENCH':'FR',
+    'INDIA':'IN','INDIAN':'IN',
+    'THAILAND':'TH','THAI':'TH',
+    'PHILIPPINES':'PH','FILIPINO':'PH',
+    'VIETNAM':'VN','VIETNAMESE':'VN',
+    'TAIWAN':'TW','TAIWANESE':'TW',
+    'CAYMAN ISLANDS':'KY',
+    'VIRGIN ISLANDS, BRITISH':'VG','BRITISH VIRGIN ISLANDS':'VG',
+    'LUXEMBOURG':'LU',
+    'SWITZERLAND':'CH','SWISS':'CH',
+    'CANADA':'CA','CANADIAN':'CA',
+    'BRAZIL':'BR','BRAZILIAN':'BR',
+    'MAURITIUS':'MU',
+    'PANAMA':'PA',
+    'BERMUDA':'BM',
+  };
+  const code = ISO[n];
+  if(!code) return '🌐';
+  // Convert ISO alpha-2 to regional indicator emoji pair
+  return [...code].map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join('');
+}
+
+// ── STATE ────────────────────────────────────────────────
+let RAW=[], IDX={}, filtered=[];
+// TC and NF are built dynamically after data loads:
+let TC={}, NF={};
+let currentPage=1, sortCol='pct', sortDir='desc';
+let charts={}, relFilter='all', relZoom, shZoom;
+let debTimer=null, filterVer=0;
+
+// ── LOADING ──────────────────────────────────────────────
+const setProgress = (p, msg) => {
+  document.getElementById('progressFill').style.width = p+'%';
+  document.getElementById('loaderStats').innerHTML = msg+'<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span>';
+};
+const parseNum = s => { if(typeof s==='number') return s; return parseInt(String(s).replace(/,/g,''),10)||0; };
+
+function normalize(r) {
+  const lf = r.LOCAL_FOREIGN==='L'?'LOCAL':r.LOCAL_FOREIGN==='A'?'FOREIGN':'';
+  return {
+    date:r.DATE||'', code:r.SHARE_CODE||'', issuer:r.ISSUER_NAME||'',
+    investor:r.INVESTOR_NAME||'', type:r.INVESTOR_TYPE||'', lf,
+    nationality:r.NATIONALITY||'', domicile:r.DOMICILE||'',
+    scripless:parseNum(r.HOLDINGS_SCRIPLESS), script:parseNum(r.HOLDINGS_SCRIP),
+    total:parseNum(r.TOTAL_HOLDING_SHARES), pct:parseFloat(r.PERCENTAGE)||0,
+    // Precomputed lowercase search string — avoids re-concat on every keystroke
+    _s:(r.SHARE_CODE+' '+r.ISSUER_NAME+' '+r.INVESTOR_NAME+' '+(r.INVESTOR_TYPE||'')+' '+(r.NATIONALITY||'')+' '+(r.DOMICILE||'')).toLowerCase()
+  };
+}
+
+function buildIndexes(data) {
+  const byCode={}, byType={}, byLF={}, byNat={}, byInvestor={}, codesS=new Set(), typesS=new Set(), natsS=new Set(), investorsS=new Set();
+  data.forEach((r,i)=>{
+    if(!byCode[r.code]) byCode[r.code]=[];  byCode[r.code].push(i); codesS.add(r.code);
+    if(r.type){if(!byType[r.type]) byType[r.type]=[];byType[r.type].push(i); typesS.add(r.type);}
+    if(r.lf){if(!byLF[r.lf]) byLF[r.lf]=[];byLF[r.lf].push(i);}
+    const nat=r.nationality||r.domicile;
+    if(nat){if(!byNat[nat]) byNat[nat]=[];byNat[nat].push(i); natsS.add(nat);}
+    if(r.investor){if(!byInvestor[r.investor]) byInvestor[r.investor]=[];byInvestor[r.investor].push(i); investorsS.add(r.investor);}
+  });
+  // Build TC: assign palette color to each unique INVESTOR_TYPE found in data
+  TC = {'': FALLBACK_COLOR};
+  [...typesS].sort().forEach((t, i) => { TC[t] = TYPE_PALETTE[i % TYPE_PALETTE.length]; });
+  // Build NF: derive flag emoji for each unique nationality found in data
+  NF = {};
+  natsS.forEach(nat => { NF[nat] = nationalityToFlag(nat); });
+  return {byCode,byType,byLF,byNat,byInvestor,
+    codes:[...codesS].sort(), types:[...typesS].sort(), nats:[...natsS].sort(), investors:[...investorsS].sort()};
+}
+
+async function loadData(json) {
+  const t0=performance.now();
+  const CHUNK=2000;
+  const result=[];
+  for(let i=0;i<json.length;i+=CHUNK){
+    json.slice(i,i+CHUNK).forEach(r=>result.push(normalize(r)));
+    setProgress(20+Math.round(i/json.length*45), `Parsing ${Math.min(i+CHUNK,json.length).toLocaleString()} / ${json.length.toLocaleString()}`);
+    await new Promise(r=>setTimeout(r,0));
+  }
+  setProgress(68,'Building indexes'); await new Promise(r=>setTimeout(r,0));
+  RAW=result; IDX=buildIndexes(RAW);
+  setProgress(80,'Populating filters'); await new Promise(r=>setTimeout(r,0));
+  initFilters();
+  setProgress(90,'Rendering'); await new Promise(r=>setTimeout(r,0));
+  filtered=[...RAW]; renderAll();
+  setProgress(100,'Ready'); await new Promise(r=>setTimeout(r,300));
+  document.getElementById('loadingOverlay').style.display='none';
+  const pb=document.getElementById('perfBar'); pb.style.display='flex';
+  document.getElementById('perfLoad').textContent=`LOAD: ${(performance.now()-t0).toFixed(0)}ms`;
+  document.getElementById('perfRows').textContent=`TOTAL: ${RAW.length.toLocaleString()} rows`;
+  document.getElementById('filteredCount').textContent=`(${RAW.length.toLocaleString()} results)`;
+}
+
+async function fetchJSON() {
+  setProgress(5,'Fetching '+DATA_URL);
+  try {
+    const res=await fetch(DATA_URL);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    setProgress(15,'Parsing response');
+    await loadData(await res.json());
+  } catch(e) {
+    document.getElementById('loaderStats').innerHTML=
+      `<span style="color:var(--accent2)">⚠ Cannot load ${DATA_URL} — please upload your JSON file using the button in the top-right corner.</span>`;
+    document.getElementById('progressFill').style.background='var(--accent2)';
+    setTimeout(()=>{
+      document.getElementById('loadingOverlay').style.display='none';
+      document.getElementById('perfBar').style.display='flex';
+    },3500);
+  }
+}
+
+document.getElementById('fileUpload').addEventListener('change',async function(e){
+  const f=e.target.files[0]; if(!f) return;
+  document.getElementById('loadingOverlay').style.display='flex';
+  document.getElementById('progressFill').style.background='var(--accent)';
+  document.getElementById('dsLabel').textContent=f.name;
+  setProgress(5,'Reading '+f.name);
+  try { await loadData(JSON.parse(await f.text())); }
+  catch(err){ document.getElementById('loaderStats').innerHTML=`<span style="color:var(--accent2)">Invalid JSON: ${err.message}</span>`; setProgress(0,''); }
+});
+
+// ── HELPERS ──────────────────────────────────────────────
+const fmt=n=>n===0?'—':n.toLocaleString('id-ID');
+const typeBadge=t=>{ if(!t) return `<span class="badge badge-default">—</span>`; const col=TC[t]||FALLBACK_COLOR; return `<span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}44">${t}</span>`; };
+const lfBadge=lf=>lf==='LOCAL'?`<span class="local-badge">L</span>`:lf==='FOREIGN'?`<span class="foreign-badge">F</span>`:`<span style="color:var(--muted);font-size:10px">—</span>`;
+const natFlag=n=>NF[n]||'🌐';
+function hl(str,q){if(!q||!str) return str||''; return str.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark>$1</mark>');}
+
+// ── FILTER ENGINE ────────────────────────────────────────
+function initFilters() {
+  const sel=(id,opts)=>{document.getElementById(id).innerHTML=opts;};
+  sel('filterCode','<option value="">All Stock Codes</option>'+IDX.codes.map(c=>`<option value="${c}">${c}</option>`).join(''));
+  sel('filterType','<option value="">All Investor Types</option>'+IDX.types.map(t=>`<option value="${t}">${t}</option>`).join(''));
+  sel('filterNat','<option value="">All Nationalities</option>'+IDX.nats.map(n=>`<option value="${n}">${n}</option>`).join(''));
+  sel('bubbleMode','<option value="all">All Stocks</option>'+IDX.codes.map(c=>`<option value="${c}">${c}</option>`).join(''));
+  sel('shStockFilter','<option value="all">All Stocks</option>'+IDX.codes.map(c=>`<option value="${c}">${c}</option>`).join(''));
+  sel('filterInvestor','<option value="">All Investors</option>'+IDX.investors.map(v=>`<option value="${v}">${v}</option>`).join(''));
+  const dates=[...new Set(RAW.map(r=>r.date))];
+  document.getElementById('datePill').innerHTML='DATE <span>'+(dates[0]||'—')+'</span>';
+  document.getElementById('totalPill').textContent=RAW.length.toLocaleString();
+}
+
+function applyFilters(){
+  const ver=++filterVer;
+  document.getElementById('debInd').classList.add('on');
+  clearTimeout(debTimer);
+  debTimer=setTimeout(()=>{
+    if(ver!==filterVer) return;
+    const t0=performance.now();
+    _doFilter();
+    document.getElementById('perfFilter').textContent=`FILTER: ${(performance.now()-t0).toFixed(1)}ms`;
+    document.getElementById('debInd').classList.remove('on');
+  },220);
+}
+
+function _doFilter(){
+  const q=document.getElementById('searchInput').value.toLowerCase().trim();
+  const code=document.getElementById('filterCode').value;
+  const type=document.getElementById('filterType').value;
+  const lf=document.getElementById('filterLF').value;
+  const nat=document.getElementById('filterNat').value;
+  const investor=document.getElementById('filterInvestor').value;
+  const sort=document.getElementById('sortBy').value;
+
+  // Index intersection — massive speedup for large datasets
+  function intersect(a,b){
+    if(a===null) return b;
+    const sb=new Set(b); return a.filter(i=>sb.has(i));
+  }
+  let cands=null;
+  if(code) cands=intersect(cands, IDX.byCode[code]||[]);
+  if(type) cands=intersect(cands, IDX.byType[type]||[]);
+  if(lf)   cands=intersect(cands, IDX.byLF[lf]||[]);
+  if(nat)  cands=intersect(cands, IDX.byNat[nat]||[]);
+  if(investor) cands=intersect(cands, IDX.byInvestor[investor]||[]);
+  const src=cands!==null?cands.map(i=>RAW[i]):RAW;
+
+  filtered=q?src.filter(r=>r._s.includes(q)):src;
+
+  if(sort){
+    const[col,dir]=sort.split('_'); const mul=dir==='desc'?-1:1;
+    filtered=[...filtered].sort((a,b)=>{
+      if(col==='pct'||col==='shares') return mul*(col==='pct'?a.pct-b.pct:a.total-b.total);
+      if(col==='code') return mul*a.code.localeCompare(b.code);
+      if(col==='investor') return mul*a.investor.localeCompare(b.investor);
+      return 0;
+    });
+  }
+  currentPage=1;
+  const t1=performance.now();
+  renderAll();
+  document.getElementById('perfRender').textContent=`RENDER: ${(performance.now()-t1).toFixed(1)}ms`;
+  document.getElementById('filteredCount').textContent=`(${filtered.length.toLocaleString()} results)`;
+}
+
+['searchInput','filterCode','filterType','filterLF','filterNat','filterInvestor','sortBy'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('input',applyFilters);
+  el.addEventListener('change',applyFilters);
+});
+
+function resetFilters(){
+  ['searchInput','filterCode','filterType','filterLF','filterNat','filterInvestor','sortBy'].forEach(id=>document.getElementById(id).value='');
+  filtered=[...RAW]; currentPage=1; renderAll();
+  document.getElementById('filteredCount').textContent=`(${RAW.length.toLocaleString()} results)`;
+}
+
+// ── SORT ─────────────────────────────────────────────────
+function sortTable(col){
+  sortDir=(sortCol===col&&sortDir==='asc')?'desc':'asc';
+  if(sortCol!==col){sortCol=col;sortDir='desc';}
+  document.querySelectorAll('thead th').forEach(th=>th.classList.remove('sorted-asc','sorted-desc'));
+  const cm={code:0,issuer:1,investor:2,type:3,lf:4,nationality:5,scripless:6,script:7,total:8,pct:9};
+  if(cm[col]!==undefined) document.querySelectorAll('thead th')[cm[col]].classList.add(sortDir==='asc'?'sorted-asc':'sorted-desc');
+  const mul=sortDir==='desc'?-1:1;
+  filtered=[...filtered].sort((a,b)=>(['pct','scripless','script','total'].includes(col))?mul*(a[col]-b[col]):mul*String(a[col]||'').localeCompare(String(b[col]||'')));
+  currentPage=1; renderTable(); renderPagination();
+}
+
+// ── TABLE ────────────────────────────────────────────────
+function renderTable(){
+  const q=document.getElementById('searchInput').value.trim();
+  const start=(currentPage-1)*PER_PAGE;
+  const page=filtered.slice(start,start+PER_PAGE);
+  const maxPct=filtered.length?filtered.slice(0,200).reduce((m,r)=>r.pct>m?r.pct:m,1):1;
+  let html='';
+  for(const r of page){
+    const nat=r.nationality||r.domicile||'—';
+    html+=`<tr>
+      <td><span class="stock-code">${hl(r.code,q)}</span></td>
+      <td><span class="issuer-name" title="${r.issuer}">${hl(r.issuer,q)}</span></td>
+      <td><span class="investor-name" title="${r.investor}">${hl(r.investor,q)}</span></td>
+      <td>${typeBadge(r.type)}</td><td>${lfBadge(r.lf)}</td>
+      <td style="font-size:11px">${natFlag(nat)} ${hl(nat,q)}</td>
+      <td class="num-cell">${fmt(r.scripless)}</td><td class="num-cell">${fmt(r.script)}</td>
+      <td class="num-cell">${fmt(r.total)}</td>
+      <td><div class="pct-bar-cell"><div class="pct-bar"><div class="pct-fill" style="width:${(r.pct/maxPct*100).toFixed(1)}%"></div></div><span class="pct-num">${r.pct.toFixed(2)}%</span></div></td>
+    </tr>`;
+  }
+  document.getElementById('tableBody').innerHTML=html;
+  document.getElementById('tableCount').textContent=filtered.length.toLocaleString()+' records';
+}
+
+function renderPagination(){
+  const total=Math.ceil(filtered.length/PER_PAGE);
+  const el=document.getElementById('pagination');
+  if(total<=1){el.innerHTML='';return;}
+  let html=`<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  for(let i=1;i<=total;i++){
+    if(i===1||i===total||Math.abs(i-currentPage)<=2) html+=`<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    else if(Math.abs(i-currentPage)===3) html+=`<span style="color:var(--muted);padding:0 2px">…</span>`;
+  }
+  html+=`<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===total?'disabled':''}>›</button>`;
+  html+=`<span class="page-info">${((currentPage-1)*PER_PAGE+1).toLocaleString()}–${Math.min(currentPage*PER_PAGE,filtered.length).toLocaleString()} of ${filtered.length.toLocaleString()}</span>`;
+  el.innerHTML=html;
+}
+function goPage(p){const t=Math.ceil(filtered.length/PER_PAGE);currentPage=Math.max(1,Math.min(p,t));renderTable();renderPagination();}
+
+// ── KPIs ─────────────────────────────────────────────────
+function fmtBig(n){
+  if(n>=1e12) return (n/1e12).toFixed(2)+'T';
+  if(n>=1e9)  return (n/1e9).toFixed(2)+'B';
+  if(n>=1e6)  return (n/1e6).toFixed(2)+'M';
+  if(n>=1e3)  return (n/1e3).toFixed(1)+'K';
+  return n.toLocaleString('id-ID');
+}
+
+function renderKPIs(){
+  const n=filtered.length;
+  if(!n) return;
+
+  // ── ROW 1 ──
+  document.getElementById('kpiRecords').textContent=n.toLocaleString();
+  document.getElementById('kpiTotal').textContent=RAW.length.toLocaleString();
+  document.getElementById('kpiIssuers').textContent=new Set(filtered.map(r=>r.code)).size.toLocaleString();
+  document.getElementById('kpiInvestors').textContent=new Set(filtered.map(r=>r.investor)).size.toLocaleString();
+  const avgPct=filtered.reduce((a,r)=>a+r.pct,0)/n;
+  document.getElementById('kpiAvgPct').textContent=avgPct.toFixed(1)+'%';
+  let top=null; for(const r of filtered) if(!top||r.pct>top.pct) top=r;
+  if(top){document.getElementById('kpiTop').textContent=top.pct.toFixed(1)+'%';document.getElementById('kpiTopSub').textContent=top.investor.slice(0,25)+(top.investor.length>25?'…':'');}
+
+  // ── ROW 2 ──
+  const totalShares=filtered.reduce((a,r)=>a+r.total,0);
+  document.getElementById('kpiTotalShares').textContent=fmtBig(totalShares);
+
+  const totalPct=filtered.reduce((a,r)=>a+r.pct,0);
+  document.getElementById('kpiTotalPct').textContent=totalPct.toFixed(1)+'%';
+  document.getElementById('kpiTotalPctSub').textContent=`avg ${avgPct.toFixed(1)}% · ${n} positions`;
+
+  const issuerCount={};
+  for(const r of filtered) issuerCount[r.code]=(issuerCount[r.code]||0)+1;
+  const topIssuer=Object.entries(issuerCount).sort((a,b)=>b[1]-a[1])[0];
+  if(topIssuer){
+    document.getElementById('kpiTopIssuer').textContent=topIssuer[0];
+    document.getElementById('kpiTopIssuerSub').textContent=topIssuer[1]+' shareholders';
+  }
+
+  const natCount={};
+  for(const r of filtered){const k=r.nationality||r.domicile||'Unknown';natCount[k]=(natCount[k]||0)+1;}
+  const topNat=Object.entries(natCount).sort((a,b)=>b[1]-a[1])[0];
+  if(topNat){
+    document.getElementById('kpiTopNat').textContent=(NF[topNat[0]]||'🌐')+' '+topNat[0].slice(0,12);
+    document.getElementById('kpiTopNatSub').textContent=topNat[1]+' investors · '+((topNat[1]/n*100).toFixed(0))+'%';
+  }
+
+  const foreignRows=filtered.filter(r=>r.lf==='FOREIGN');
+  const foreignPctSum=foreignRows.reduce((a,r)=>a+r.pct,0);
+  const totalPctAll=filtered.reduce((a,r)=>a+r.pct,0)||1;
+  document.getElementById('kpiForeignPct').textContent=((foreignPctSum/totalPctAll)*100).toFixed(1)+'%';
+  document.getElementById('kpiForeignSub').textContent=foreignRows.length+' foreign positions · '+fmtBig(foreignRows.reduce((a,r)=>a+r.total,0))+' shares';
+
+  // ── FUN FACTS ──
+  renderFunFacts(n, totalShares, avgPct, topNat, topIssuer, issuerCount, natCount);
+}
+
+function renderFunFacts(n, totalShares, avgPct, topNat, topIssuer, issuerCount, natCount){
+  const localRows   = filtered.filter(r=>r.lf==='LOCAL');
+  const foreignRows = filtered.filter(r=>r.lf==='FOREIGN');
+  const localShares  = localRows.reduce((a,r)=>a+r.total,0);
+  const foreignShares= foreignRows.reduce((a,r)=>a+r.total,0);
+
+  // ── CONTEXT: berapa saham unik dalam filtered saat ini? ────────────────
+  const uniqueCodes = [...new Set(filtered.map(r=>r.code))];
+  const stockCount  = uniqueCodes.length;
+  const multiStock  = stockCount > 1;  // TRUE kalau ada lebih dari 1 saham
+
+  // ── BUILD PER-STOCK MAP (kalkulasi SELALU per-saham, bukan gabung) ──────
+  // Setiap metrik per-saham dihitung independen, lalu di-aggregate
+  const perStock = {};
+  for(const r of filtered){
+    if(!perStock[r.code]) perStock[r.code] = {
+      code: r.code, issuer: r.issuer,
+      rows: [], totalPct: 0, localPct: 0, foreignPct: 0,
+      strategicPct: 0,   // sum pct >= 5%
+      totalShares: 0, localShares: 0, foreignShares: 0,
+      scripless: 0, scrip: 0,
+      hhi: 0,            // Herfindahl–Hirschman Index
+      investors: new Set(), localInv: new Set(), foreignInv: new Set(),
+      types: {}, nats: {}
+    };
+    const s = perStock[r.code];
+    s.rows.push(r);
+    s.totalPct    += r.pct;
+    s.totalShares += r.total;
+    s.scripless   += r.scripless;
+    s.scrip       += r.script;
+    s.hhi         += (r.pct / 100) * (r.pct / 100) * 10000;  // skala 0-10000
+    s.investors.add(r.investor);
+    if(r.lf==='LOCAL')  { s.localPct  += r.pct; s.localShares  += r.total; s.localInv.add(r.investor);   }
+    if(r.lf==='FOREIGN'){ s.foreignPct+= r.pct; s.foreignShares+= r.total; s.foreignInv.add(r.investor); }
+    if(r.pct >= 5)      { s.strategicPct += r.pct; }
+    if(r.type) s.types[r.type] = (s.types[r.type]||0)+1;
+    const nat = r.nationality||r.domicile;
+    if(nat) s.nats[nat] = (s.nats[nat]||0)+1;
+  }
+  const stockList = Object.values(perStock);
+
+  // ── VALIDASI: tandai saham dengan data valid atau anomali ───────────────
+  // totalPct > 110 → kemungkinan duplikasi data / tanggal berbeda
+  // totalPct < 1   → data sangat minim
+  stockList.forEach(s=>{
+    s.valid        = s.totalPct > 0;
+    s.overflowed   = s.totalPct > 110;   // anomali: lebih dari 110% total
+    s.dataWarning  = s.overflowed ? `⚠ total ${s.totalPct.toFixed(1)}%` : null;
+    // Free Float per saham: 100% - strategic (≥5%) — hanya valid jika totalPct ≤ 110
+    s.freeFloat    = s.overflowed ? null : Math.max(0, 100 - s.strategicPct);
+    // Foreign ratio dari total tracked (bukan dari 100%)
+    s.foreignRatio = s.totalPct > 0 ? (s.foreignPct / s.totalPct) * 100 : 0;
+    // Investor count
+    s.invCount     = s.investors.size;
+    // Gini per saham (inequality antar posisi dalam 1 saham)
+    const ps = s.rows.map(r=>r.pct).sort((a,b)=>a-b);
+    let g=0;
+    if(ps.length>1){
+      const sm=ps.reduce((a,v)=>a+v,0)||1;
+      let cs=0; ps.forEach((p,i)=>{cs+=p;g+=(i+1)/ps.length - cs/sm;});
+      g=(2*g)/ps.length;
+    }
+    s.gini = g;
+  });
+
+  // ── VALIDASI STATS: pisahkan saham valid vs anomali ────────────────────
+  const validStocks    = stockList.filter(s=>s.valid && !s.overflowed);
+  const anomalyStocks  = stockList.filter(s=>s.overflowed);
+  const ffValidStocks  = validStocks.filter(s=>s.freeFloat !== null);
+
+  // ── FREE FLOAT (hanya dari saham valid) ────────────────────────────────
+  const avgFF       = ffValidStocks.length ? ffValidStocks.reduce((a,s)=>a+s.freeFloat,0)/ffValidStocks.length : null;
+  const highestFF   = ffValidStocks.length ? [...ffValidStocks].sort((a,b)=>b.freeFloat-a.freeFloat)[0] : null;
+  const tightestFF  = ffValidStocks.length ? [...ffValidStocks].sort((a,b)=>a.freeFloat-b.freeFloat)[0] : null;
+
+  // ── HHI (per saham valid) ──────────────────────────────────────────────
+  const hhiList         = validStocks.map(s=>({code:s.code,hhi:s.hhi,invCount:s.invCount}));
+  const mostConcentrated= hhiList.length ? [...hhiList].sort((a,b)=>b.hhi-a.hhi)[0] : null;
+  const leastConcentrated= hhiList.length ? [...hhiList].sort((a,b)=>a.hhi-b.hhi)[0] : null;
+  const avgHHI          = hhiList.length ? hhiList.reduce((a,s)=>a+s.hhi,0)/hhiList.length : 0;
+
+  // ── GINI (aggregate lintas semua posisi per-saham, hanya valid) ─────────
+  // Kalau multi-saham: rata-rata gini per saham; kalau single: gini posisi
+  let giniDisplay, giniDesc;
+  if(stockCount === 1){
+    const s = stockList[0];
+    giniDisplay = s.gini.toFixed(3);
+    giniDesc = `Ketimpangan antar ${s.invCount} pemegang saham ${s.code}`;
+  } else {
+    const avgGini = validStocks.length ? validStocks.reduce((a,s)=>a+s.gini,0)/validStocks.length : 0;
+    const maxGiniS = [...validStocks].sort((a,b)=>b.gini-a.gini)[0];
+    giniDisplay = avgGini.toFixed(3)+' avg';
+    giniDesc = maxGiniS ? `Paling timpang: ${maxGiniS.code} (${maxGiniS.gini.toFixed(3)}) · dihitung per-saham` : `Rata-rata across ${validStocks.length} saham`;
+  }
+
+  // ── FOREIGN DOMINANCE (per saham valid) ────────────────────────────────
+  const foreignDomList  = validStocks.map(s=>({code:s.code,ratio:s.foreignRatio,foreignPct:s.foreignPct,totalPct:s.totalPct}));
+  const mostForeignDom  = foreignDomList.length ? [...foreignDomList].sort((a,b)=>b.ratio-a.ratio)[0] : null;
+
+  // ── CLASSIC METRICS ────────────────────────────────────────────────────
+  let mostConc=null;
+  for(const r of filtered) if(!mostConc||r.pct>mostConc.pct) mostConc=r;
+
+  const topDiv = Object.entries(issuerCount).sort((a,b)=>b[1]-a[1])[0];
+
+  const invStocks={};
+  for(const r of filtered){if(!invStocks[r.investor])invStocks[r.investor]=new Set();invStocks[r.investor].add(r.code);}
+  const polyInv=Object.entries(invStocks).sort((a,b)=>b[1].size-a[1].size)[0];
+
+  const sortedPcts=[...filtered].sort((a,b)=>a.pct-b.pct);
+  const median=sortedPcts[Math.floor(sortedPcts.length/2)]?.pct||0;
+
+  const totalScripless=filtered.reduce((a,r)=>a+r.scripless,0);
+  const totalScrip=filtered.reduce((a,r)=>a+r.script,0);
+  const scripRatio=totalScripless+totalScrip>0?((totalScripless/(totalScripless+totalScrip))*100):0;
+
+  const uniqueNats=Object.keys(natCount).length;
+
+  const typeAvg={};
+  for(const r of filtered){if(!typeAvg[r.type||'—'])typeAvg[r.type||'—']={sum:0,n:0};typeAvg[r.type||'—'].sum+=r.pct;typeAvg[r.type||'—'].n++;}
+  const topTypeAvg=Object.entries(typeAvg).map(([t,v])=>({t,avg:v.sum/v.n})).sort((a,b)=>b.avg-a.avg)[0];
+
+  const majorityHolders=filtered.filter(r=>r.pct>=50).length;
+
+  // ── CROSS-OWNERSHIP (hanya bermakna jika multi-saham) ──────────────────
+  const pairCount={};
+  const codeInvestors={};
+  for(const r of filtered){if(!codeInvestors[r.code])codeInvestors[r.code]=[];codeInvestors[r.code].push(r.investor);}
+  Object.values(codeInvestors).forEach(invs=>{
+    for(let i=0;i<invs.length;i++) for(let j=i+1;j<invs.length;j++){
+      const k=[invs[i],invs[j]].sort().join('|||');
+      pairCount[k]=(pairCount[k]||0)+1;
+    }
+  });
+  const topPair=Object.entries(pairCount).sort((a,b)=>b[1]-a[1])[0];
+  const topPairNames=topPair?topPair[0].split('|||'):[];
+  const totalUniquePairs=Object.keys(pairCount).length;
+
+  // ── PASSIVE/ACTIVE PROXY ───────────────────────────────────────────────
+  const smallHolders=new Set(filtered.filter(r=>r.pct<1).map(r=>r.investor)).size;
+  const largeHolders=new Set(filtered.filter(r=>r.pct>=5).map(r=>r.investor)).size;
+
+  // Insider proxy — per-saham: rata-rata local ≥5%
+  const insiderProxy=filtered.filter(r=>r.lf==='LOCAL'&&r.pct>=5);
+  const insiderPctSum=insiderProxy.reduce((a,r)=>a+r.pct,0)/Math.max(stockCount,1);
+
+  // ── HELPER: label validitas untuk display ──────────────────────────────
+  const validLabel = (val, extra='') => val !== null ? val : `—${extra?' ('+extra+')':''}`;
+  const anomalyNote = anomalyStocks.length > 0
+    ? `⚠ ${anomalyStocks.length} saham dilewati (total >110%: ${anomalyStocks.map(s=>s.code).join(', ')})`
+    : `Dihitung dari ${ffValidStocks.length} saham valid`;
+
+  // ── CONTEXT BADGE untuk kartu per-saham ───────────────────────────────
+  const stockCtx = multiStock
+    ? `${stockCount} saham · per-saham`
+    : `${uniqueCodes[0]} · 1 saham`;
+
+  // ── BUILD FACTS ────────────────────────────────────────────────────────
+  const facts=[
+    // FREE FLOAT
+    {icon:'🎈', color:'#2e75cc', label:'Avg Estimated Free Float',
+     value: avgFF !== null ? avgFF.toFixed(1)+'%' : '—',
+     desc: anomalyNote},
+
+    {icon:'🔓', color:'#448361', label:'Free Float Tertinggi',
+     value: highestFF ? highestFF.code : '—',
+     desc: highestFF ? `~${highestFF.freeFloat.toFixed(1)}% free float · ${highestFF.strategicPct.toFixed(1)}% strategic · ${stockCtx}` : '—'},
+
+    {icon:'🔒', color:'#e16259', label:'Free Float Terendah',
+     value: tightestFF ? tightestFF.code : '—',
+     desc: tightestFF ? `~${tightestFF.freeFloat.toFixed(1)}% free float · ${tightestFF.strategicPct.toFixed(1)}% terkunci · ${stockCtx}` : '—'},
+
+    // KONSENTRASI HHI
+    {icon:'⚡', color:'#d9730d', label:'Paling Terkonsentrasi (HHI)',
+     value: mostConcentrated ? mostConcentrated.code : '—',
+     desc: mostConcentrated ? `HHI ${mostConcentrated.hhi.toFixed(0)} · ${mostConcentrated.invCount} pemegang · avg HHI ${avgHHI.toFixed(0)}` : '—'},
+
+    {icon:'🌊', color:'#9b7ec8', label:'Paling Tersebar (HHI)',
+     value: leastConcentrated ? leastConcentrated.code : '—',
+     desc: leastConcentrated ? `HHI ${leastConcentrated.hhi.toFixed(0)} · ${leastConcentrated.invCount} pemegang · paling merata` : '—'},
+
+    {icon:'📐', color:'#2e75cc', label:'Gini Ketimpangan Kepemilikan',
+     value: giniDisplay,
+     desc: giniDesc},
+
+    // ASING / LOKAL
+    {icon:'🌏', color:'#d9730d', label:'Dominasi Asing Tertinggi',
+     value: mostForeignDom ? mostForeignDom.code : '—',
+     desc: mostForeignDom ? `${mostForeignDom.ratio.toFixed(1)}% kepemilikan tercatat adalah asing · ${mostForeignDom.foreignPct.toFixed(1)}% dari ${mostForeignDom.totalPct.toFixed(1)}%` : '—'},
+
+    {icon:'🏦', color:'#448361', label:'Insider Lokal (≥5% Lokal)',
+     value: insiderPctSum.toFixed(1)+'% avg',
+     desc: `${insiderProxy.length} posisi lokal besar · rata-rata per saham dari ${stockCount} saham`},
+
+    // KLASIK
+    {icon:'🏆', color:'#cb912f', label:'Posisi Terbesar',
+     value: mostConc ? `${mostConc.pct.toFixed(1)}%` : '—',
+     desc: mostConc ? `${mostConc.investor.slice(0,26)} · ${mostConc.code}` : '—'},
+
+    {icon:'🔗', color:'#d9730d', label:'Investor Paling Aktif',
+     value: polyInv ? polyInv[0].slice(0,17)+(polyInv[0].length>17?'…':'') : '—',
+     desc: polyInv ? `Memiliki saham di ${polyInv[1].size} emiten berbeda` : '—'},
+
+    {icon:'🤝', color:'#9b7ec8', label:'Pasangan Co-Investment',
+     value: multiStock ? (topPairNames.length?topPairNames[0].slice(0,15)+'…':'—') : 'N/A (1 saham)',
+     desc: multiStock
+       ? (topPair?`Berbagi ${topPair[1]} saham bersama · ${totalUniquePairs.toLocaleString()} total pasangan`:'—')
+       : 'Filter ke beberapa saham untuk melihat co-investor'},
+
+    {icon:'📊', color:'#448361', label:'Median Kepemilikan',
+     value: median.toFixed(2)+'%',
+     desc: `Persentil ke-50 dari ${n} posisi`},
+
+    {icon:'🎯', color:'#e16259', label:'Pengendali Mayoritas (≥50%)',
+     value: majorityHolders+' pemegang',
+     desc: `${majorityHolders} posisi dengan kendali mayoritas`},
+
+    {icon:'🌐', color:'#2e75cc', label:'Keragaman Nasionalitas',
+     value: uniqueNats+' negara',
+     desc: `${uniqueNats} nasionalitas · avg ${(n/Math.max(uniqueNats,1)).toFixed(1)} posisi per negara`},
+
+    {icon:'🏛️', color:'#cb912f', label:'Emiten Paling Banyak Pemegang',
+     value: topDiv ? topDiv[0] : '—',
+     desc: topDiv ? `${topDiv[1]} pemegang saham terdaftar` : '—'},
+
+    {icon:'📉', color:'#9b7ec8', label:'Pemegang Kecil (<1%)',
+     value: smallHolders.toLocaleString(),
+     desc: `vs ${largeHolders} pemegang besar (≥5%) · indikator investor ritel`},
+
+    {icon:'💹', color:'#d9730d', label:'Rasio Scripless',
+     value: scripRatio.toFixed(1)+'%',
+     desc: `${fmtBig(totalScripless)} elektronik vs ${fmtBig(totalScrip)} fisik`},
+
+    {icon:'💰', color:'#cb912f', label:'Total Volume Saham',
+     value: fmtBig(totalShares),
+     desc: `${fmtBig(localShares)} lokal + ${fmtBig(foreignShares)} asing`},
+
+    {icon:'📈', color:'#448361', label:'Tipe Investor Dominan',
+     value: topTypeAvg ? topTypeAvg.t : '—',
+     desc: topTypeAvg ? `Avg stake tertinggi: ${topTypeAvg.avg.toFixed(1)}% per posisi` : '—'},
+
+    {icon:'🔢', color:'#2e75cc', label:'Rata-rata Investor per Saham',
+     value: stockCount>0?(n/stockCount).toFixed(1):'—',
+     desc: `${stockCount} emiten · ${n} total posisi terlacak`},
+  ];
+
+  // ── ANOMALY WARNING BANNER ─────────────────────────────────────────────
+  let bannerHtml = '';
+  if(anomalyStocks.length > 0){
+    bannerHtml = `<div style="grid-column:1/-1;background:#fff8f0;border:1px solid #f59e0b;border-radius:6px;padding:10px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#92400e;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:16px">⚠️</span>
+      <span><strong>${anomalyStocks.length} saham memiliki total kepemilikan >110%</strong> — kemungkinan ada duplikasi data atau tanggal berbeda. Kalkulasi Free Float & HHI untuk saham ini dilewati: <strong>${anomalyStocks.map(s=>`${s.code} (${s.totalPct.toFixed(1)}%)`).join(', ')}</strong></span>
+    </div>`;
+  }
+
+  document.getElementById('funfactsStrip').innerHTML = bannerHtml + facts.map(f=>`
+    <div class="funfact" style="--ff-color:${f.color}">
+      <div class="funfact-icon">${f.icon}</div>
+      <div class="funfact-label">${f.label}</div>
+      <div class="funfact-value">${f.value}</div>
+      <div class="funfact-desc">${f.desc}</div>
+    </div>`).join('');
+}
+
+// ── TICKER ───────────────────────────────────────────────
+function renderTicker(){
+  const m={};
+  for(const r of filtered) if(!m[r.code]||r.pct>m[r.code].max) m[r.code]={issuer:r.issuer,max:r.pct};
+  document.getElementById('tickerStrip').innerHTML=Object.entries(m).map(([c,v])=>
+    `<div class="ticker-item"><span class="ticker-code">${c}</span><span style="color:var(--muted);font-size:10px">${v.issuer.slice(0,19)}</span><span class="ticker-pct">↑${v.max.toFixed(2)}%</span></div>`).join('');
+}
+
+// ── CHARTS ───────────────────────────────────────────────
+function sample(arr,n){
+  if(arr.length<=n) return arr;
+  const s=arr.length/n; const r=[]; for(let i=0;i<n;i++) r.push(arr[Math.floor(i*s)]); return r;
+}
+function countBy(arr,kf){const m={};for(const r of arr){const k=kf(r)||'UNKNOWN';m[k]=(m[k]||0)+1;}return m;}
+
+function renderTypeChart(){
+  const src=sample(filtered,CHART_SMPL);
+  const counts=countBy(src,r=>r.type); const labels=Object.keys(counts); const data=Object.values(counts);
+  const colors=labels.map(t=>TC[t]||FALLBACK_COLOR);
+  if(charts.type) charts.type.destroy();
+  charts.type=new Chart(document.getElementById('typeChart'),{type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:colors.slice(0,labels.length),borderWidth:0,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'right',labels:{color:'#9b9a97',font:{family:'IBM Plex Mono',size:10},boxWidth:11,padding:10}},
+      tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw} (${((c.raw/src.length)*100).toFixed(1)}%)`}}}}});
+}
+
+function renderNatPanel(){
+  const src=sample(filtered,CHART_SMPL);
+  const sorted=Object.entries(countBy(src,r=>r.nationality||r.domicile)).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  const max=sorted[0]?.[1]||1;
+  const colors=sorted.map(([n])=>NF[n]?TYPE_PALETTE[sorted.findIndex(([k])=>k===n)%TYPE_PALETTE.length]:FALLBACK_COLOR);
+  document.getElementById('natPanel').innerHTML=sorted.map(([n,c],i)=>
+    `<div class="nat-row"><span class="nat-flag">${natFlag(n)}</span><span class="nat-name">${n}</span>
+    <div class="nat-count-bar"><div class="nat-count-fill" style="width:${(c/max*100).toFixed(0)}%;background:${colors[i]}"></div></div>
+    <span class="nat-count">${c}</span></div>`).join('');
+}
+
+function renderHoldingsChart(){
+  const src=sample(filtered,CHART_SMPL);
+  const b={'0–5%':0,'5–15%':0,'15–30%':0,'30–50%':0,'50–80%':0,'80%+':0};
+  for(const r of src){if(r.pct<5)b['0–5%']++;else if(r.pct<15)b['5–15%']++;else if(r.pct<30)b['15–30%']++;else if(r.pct<50)b['30–50%']++;else if(r.pct<80)b['50–80%']++;else b['80%+']++;}
+  if(charts.holdings) charts.holdings.destroy();
+  charts.holdings=new Chart(document.getElementById('holdingsChart'),{type:'bar',
+    data:{labels:Object.keys(b),datasets:[{label:'# Holders',data:Object.values(b),backgroundColor:'rgba(218,138,78,.25)',borderColor:'#da8a4e',borderWidth:1,borderRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#9b9a97',font:{family:'IBM Plex Mono',size:9}},grid:{color:'rgba(227,226,224,.8)'}},y:{ticks:{color:'#9b9a97',font:{family:'IBM Plex Mono',size:9}},grid:{color:'rgba(227,226,224,.8)'}}}}});
+}
+
+function renderTopInvestors(){
+  const top=[...filtered].sort((a,b)=>b.pct-a.pct).slice(0,10);
+  document.getElementById('topInvestors').innerHTML=top.map((r,i)=>
+    `<div class="top-investor-row"><span class="rank-num ${i<3?'top3':''}">${i+1}</span>
+    <div class="inv-info"><div class="inv-name" title="${r.investor}">${r.investor}</div>
+    <div class="inv-meta">${r.code} · ${r.type||'—'} · ${r.nationality||r.domicile||'—'}</div></div>
+    <span class="inv-pct">${r.pct.toFixed(2)}%</span></div>`).join('');
+}
+
+function renderLFChart(){
+  const lf={LOCAL:0,FOREIGN:0,OTHER:0};
+  for(const r of filtered) lf[r.lf||'OTHER']++;
+  if(charts.lf) charts.lf.destroy();
+  charts.lf=new Chart(document.getElementById('lfChart'),{type:'pie',
+    data:{labels:['Local','Foreign','Other'],datasets:[{data:[lf.LOCAL,lf.FOREIGN,lf.OTHER],backgroundColor:['rgba(122,184,122,.7)','rgba(196,122,58,.7)','rgba(100,116,139,.4)'],borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'right',labels:{color:'#9b9a97',font:{family:'IBM Plex Mono',size:10},boxWidth:11,padding:10}}}}});
+}
+
+function renderStockChart(){
+  const byCode={};
+  for(const r of filtered) if(!byCode[r.code]||r.pct>byCode[r.code]) byCode[r.code]=r.pct;
+  const sorted=Object.entries(byCode).sort((a,b)=>b[1]-a[1]).slice(0,30);
+  const codes=sorted.map(e=>e[0]), maxP=sorted.map(e=>e[1]);
+  if(charts.stock) charts.stock.destroy();
+  charts.stock=new Chart(document.getElementById('stockChart'),{type:'bar',
+    data:{labels:codes,datasets:[{label:'Max Holder %',data:maxP,backgroundColor:codes.map((_,i)=>`hsla(${30+i*8},70%,55%,.65)`),borderColor:codes.map((_,i)=>`hsla(${30+i*8},70%,65%,1)`),borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#9b9a97',font:{family:'IBM Plex Mono',size:9},maxRotation:45},grid:{color:'rgba(227,226,224,.8)'}},
+              y:{ticks:{color:'#9b9a97',font:{family:'IBM Plex Mono',size:9},callback:v=>v+'%'},grid:{color:'rgba(227,226,224,.8)'},max:100}}}});
+}
+
+// ── BUBBLE MAP ───────────────────────────────────────────
+function renderBubbleMap(){
+  const mode=document.getElementById('bubbleMode').value;
+  let data=mode==='all'?filtered:filtered.filter(r=>r.code===mode);
+  if(data.length>BUBBLE_CAP) data=[...data].sort((a,b)=>b.pct-a.pct).slice(0,BUBBLE_CAP);
+  const wrap=document.getElementById('bubbleMapWrap'); wrap.innerHTML='';
+  if(!data.length){wrap.innerHTML='<p style="color:var(--muted);font-family:Space Mono,monospace;padding:30px;font-size:12px">No data</p>';return;}
+  const W=wrap.clientWidth||900,H=350,ML=56,MR=20,MT=20,MB=50,PW=W-ML-MR,PH=H-MT-MB;
+  const codes=[...new Set(data.map(r=>r.code))].sort();
+  const maxT=Math.max(...data.map(r=>r.total),1);
+  const xS=c=>{const i=codes.indexOf(c);const s=PW/codes.length;return ML+s*i+s/2;};
+  const yS=p=>MT+PH-(p/100)*PH;
+  const rS=t=>6+(t/maxT)*35;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('width','100%');svg.setAttribute('height',H);
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  Object.entries(TC).forEach(([t,c])=>{
+    const g=document.createElementNS('http://www.w3.org/2000/svg','radialGradient');
+    g.setAttribute('id','bg'+t.replace(/\W/g,'x'));
+    ['0%','100%'].forEach((o,i)=>{const s=document.createElementNS('http://www.w3.org/2000/svg','stop');s.setAttribute('offset',o);s.setAttribute('stop-color',c);s.setAttribute('stop-opacity',i?'0.18':'0.9');g.appendChild(s);});
+    defs.appendChild(g);});
+  svg.appendChild(defs);
+  [0,25,50,75,100].forEach(p=>{
+    const y=yS(p);
+    const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',ML);l.setAttribute('x2',W-MR);l.setAttribute('y1',y);l.setAttribute('y2',y);l.setAttribute('class','bubble-grid');svg.appendChild(l);
+    const t2=document.createElementNS('http://www.w3.org/2000/svg','text');t2.setAttribute('x',ML-7);t2.setAttribute('y',y+4);t2.setAttribute('text-anchor','end');t2.setAttribute('class','bubble-axis-label');t2.textContent=p+'%';svg.appendChild(t2);
+  });
+  codes.forEach(c=>{
+    const x=xS(c);
+    const vl=document.createElementNS('http://www.w3.org/2000/svg','line');vl.setAttribute('x1',x);vl.setAttribute('x2',x);vl.setAttribute('y1',MT);vl.setAttribute('y2',MT+PH);vl.setAttribute('stroke','#3e2e1e');vl.setAttribute('stroke-dasharray','3,6');svg.appendChild(vl);
+    const t2=document.createElementNS('http://www.w3.org/2000/svg','text');t2.setAttribute('x',x);t2.setAttribute('y',MT+PH+21);t2.setAttribute('text-anchor','middle');t2.setAttribute('font-family',"'IBM Plex Mono',monospace");t2.setAttribute('font-size',10);t2.setAttribute('font-weight','700');t2.setAttribute('fill','#cb912f');t2.textContent=c;svg.appendChild(t2);
+  });
+  const byCode={};data.forEach(r=>{if(!byCode[r.code])byCode[r.code]=[];byCode[r.code].push(r);});
+  const tip=document.getElementById('bubbleTooltip');
+  data.slice().sort((a,b)=>b.total-a.total).forEach(r=>{
+    const g=byCode[r.code],idx=g.indexOf(r),sp=Math.min(50,PW/codes.length*0.48);
+    const jit=g.length>1?(idx/(g.length-1)-.5)*sp:0;
+    const cx=xS(r.code)+jit,cy=yS(r.pct),rad=rS(r.total),col=TC[r.type]||TC[''];
+    const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');ring.setAttribute('cx',cx);ring.setAttribute('cy',cy);ring.setAttribute('r',rad+3);ring.setAttribute('fill','none');ring.setAttribute('stroke',col);ring.setAttribute('stroke-width','1');ring.setAttribute('opacity','0.22');svg.appendChild(ring);
+    const ci=document.createElementNS('http://www.w3.org/2000/svg','circle');ci.setAttribute('cx',cx);ci.setAttribute('cy',cy);ci.setAttribute('r',rad);ci.setAttribute('fill',`url(#bg${(r.type||'').replace(/\W/g,'x')})`);ci.setAttribute('stroke',col);ci.setAttribute('stroke-width','1.5');ci.setAttribute('opacity','0.85');ci.setAttribute('class','bubble-circle');
+    ci.addEventListener('mouseenter',e=>{tip.style.display='block';tip.innerHTML=`<div style="color:${col};font-weight:700;margin-bottom:5px">${r.code} · ${r.type||'—'}</div><div style="color:#907e6e;font-size:10px;margin-bottom:5px">${r.investor}</div><div>Holding: <span style="color:${col}">${r.pct.toFixed(2)}%</span></div><div>Shares: <span style="color:#37352f">${fmt(r.total)}</span></div><div>L/F: <span style="color:#37352f">${r.lf||'—'}</span></div>`;});
+    ci.addEventListener('mousemove',e=>{tip.style.left=Math.min(e.clientX+14,window.innerWidth-270)+'px';tip.style.top=Math.min(e.clientY-8,window.innerHeight-160)+'px';});
+    ci.addEventListener('mouseleave',()=>tip.style.display='none');
+    svg.appendChild(ci);
+    if(rad>17){const lb=document.createElementNS('http://www.w3.org/2000/svg','text');lb.setAttribute('x',cx);lb.setAttribute('y',cy+4);lb.setAttribute('text-anchor','middle');lb.setAttribute('font-family',"'IBM Plex Mono',monospace");lb.setAttribute('font-size','9');lb.setAttribute('fill','#fff');lb.setAttribute('opacity','0.9');lb.setAttribute('pointer-events','none');lb.textContent=r.pct.toFixed(1)+'%';svg.appendChild(lb);}
+  });
+  wrap.appendChild(svg);
+  document.getElementById('bubbleLegend').innerHTML=[...new Set(data.map(r=>r.type||''))].map(t=>
+    `<div class="bubble-legend-item"><div class="bubble-legend-dot" style="background:${TC[t]||'#907e6e'}"></div><span>${t||'UNKNOWN'}</span></div>`).join('')+
+    `<div class="bubble-legend-item" style="margin-left:auto;font-size:9px">SIZE=shares · top ${BUBBLE_CAP}</div>`;
+}
+
+// ── RELATIONSHIP MAP ─────────────────────────────────────
+function setRelFilter(f,btn){
+  relFilter=f;
+  document.querySelectorAll('.map-btn').forEach(b=>{if(b.textContent==='ALL'||b.textContent==='LOCAL'||b.textContent==='FOREIGN') b.classList.remove('active');});
+  btn.classList.add('active');
+  renderRelMap();
+}
+function resetRelZoom(){const s=d3.select('#relMapWrap svg');if(relZoom&&s.size())s.transition().duration(400).call(relZoom.transform,d3.zoomIdentity);}
+function resetSHZoom(){const s=d3.select('#shMapWrap svg');if(shZoom&&s.size())s.transition().duration(400).call(shZoom.transform,d3.zoomIdentity);}
+
+function renderRelMap(){
+  const wrap=document.getElementById('relMapWrap'); wrap.innerHTML='';
+  const tip=document.getElementById('relTooltip');
+  let data=relFilter==='all'?filtered:filtered.filter(r=>r.lf===relFilter);
+  if(data.length>GRAPH_CAP) data=[...data].sort((a,b)=>b.pct-a.pct).slice(0,GRAPH_CAP);
+  if(!data.length){wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);font-family:Space Mono,monospace;font-size:12px">NO DATA</div>';return;}
+  const W=wrap.clientWidth||900,H=440;
+  const isSet=new Set(data.map(r=>r.code)), invSet=new Set(data.map(r=>r.investor));
+  const nodes=[],nIdx={};
+  isSet.forEach(c=>{nIdx['i_'+c]=nodes.length;nodes.push({id:'i_'+c,label:c,kind:'issuer',issuer:data.find(r=>r.code===c)?.issuer||c,count:data.filter(r=>r.code===c).length});});
+  invSet.forEach(inv=>{nIdx['v_'+inv]=nodes.length;const row=data.find(r=>r.investor===inv);nodes.push({id:'v_'+inv,label:inv.length>19?inv.slice(0,19)+'…':inv,fullName:inv,kind:'investor',type:row?.type||'',lf:row?.lf||'',nat:row?.nationality||row?.domicile||''});});
+  const links=data.map(r=>({source:nIdx['i_'+r.code],target:nIdx['v_'+r.investor],pct:r.pct,total:r.total,code:r.code,investor:r.investor,lf:r.lf,type:r.type}));
+  const svg=d3.select(wrap).append('svg').attr('width',W).attr('height',H);
+  const g=svg.append('g');
+  relZoom=d3.zoom().scaleExtent([0.2,5]).on('zoom',e=>g.attr('transform',e.transform));
+  svg.call(relZoom);
+  const defs=svg.append('defs');
+  [{col:'#7ab87a',id:'a0'},{col:'#c47a3a',id:'a1'},{col:'#907e6e',id:'a2'}].forEach(({col,id})=>{
+    defs.append('marker').attr('id',id).attr('viewBox','0 -4 10 8').attr('refX',20).attr('refY',0).attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto').append('path').attr('d','M0,-4L10,0L0,4').attr('fill',col).attr('opacity',.6);});
+  const lkCol=lf=>lf==='LOCAL'?'#7ab87a':lf==='FOREIGN'?'#c47a3a':'#907e6e';
+  const lkMk=lf=>lf==='LOCAL'?'url(#a0)':lf==='FOREIGN'?'url(#a1)':'url(#a2)';
+  const link=g.append('g').selectAll('line').data(links).join('line').attr('class','rel-link').attr('stroke',d=>lkCol(d.lf)).attr('stroke-width',d=>Math.max(0.7,Math.min(5,d.pct/14))).attr('marker-end',d=>lkMk(d.lf));
+  const drag=d3.drag().on('start',(e,d)=>{if(!e.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;});
+  const node=g.append('g').selectAll('g').data(nodes).join('g').call(drag);
+  node.append('circle').attr('r',d=>d.kind==='issuer'?22:Math.max(9,Math.min(16,8+data.filter(r=>r.investor===d.fullName).length*2))).attr('fill',d=>d.kind==='issuer'?'rgba(245,158,11,.18)':(TC[d.type]||'#907e6e')+'28').attr('stroke',d=>d.kind==='issuer'?'#d4a853':(TC[d.type]||'#907e6e')).attr('stroke-width',d=>d.kind==='issuer'?2.5:1.5);
+  node.append('text').attr('dy',4).attr('text-anchor','middle').attr('fill',d=>d.kind==='issuer'?'#d4a853':(TC[d.type]||'#907e6e')).attr('font-size',d=>d.kind==='issuer'?10:8).attr('font-weight','700').attr('font-family',"'IBM Plex Mono',monospace").attr('pointer-events','none').text(d=>d.kind==='issuer'?d.label:(d.type||'?'));
+  node.append('text').attr('dy',d=>d.kind==='issuer'?36:26).attr('text-anchor','middle').attr('fill',d=>d.kind==='issuer'?'#cb912f':'#6b6b6b').attr('font-size',d=>d.kind==='issuer'?10:9).attr('pointer-events','none').text(d=>d.label);
+  node.on('mouseenter',(e,d)=>{tip.style.display='block';if(d.kind==='issuer')tip.innerHTML=`<div style="color:#d4a853;font-weight:700;margin-bottom:5px">${d.issuer}</div><div>Code: <span style="color:#d4a853">${d.label}</span></div><div>Shareholders: <span style="color:#da8a4e">${d.count}</span></div>`;else{const s=data.filter(r=>r.investor===d.fullName);tip.innerHTML=`<div style="color:${TC[d.type]||'#907e6e'};font-weight:700;margin-bottom:5px">${d.fullName}</div><div>Type: <span style="color:#37352f">${d.type||'—'}</span></div><div>L/F: <span style="color:#37352f">${d.lf||'—'}</span></div><div>Stakes: <span style="color:#da8a4e">${s.map(r=>r.code+'('+r.pct.toFixed(1)+'%)').join(', ')}</span></div>`;}})
+    .on('mousemove',e=>{tip.style.left=Math.min(e.clientX+14,window.innerWidth-260)+'px';tip.style.top=Math.min(e.clientY-8,window.innerHeight-160)+'px';}).on('mouseleave',()=>tip.style.display='none');
+  link.on('mouseenter',(e,d)=>{tip.style.display='block';tip.innerHTML=`<div style="color:#da8a4e;font-weight:700;margin-bottom:5px">${d.code} ↔ ${(d.investor||'').slice(0,24)}</div><div>Holding: <span style="color:#da8a4e">${d.pct.toFixed(2)}%</span></div><div>Shares: <span style="color:#37352f">${fmt(d.total)}</span></div><div>L/F: <span style="color:#37352f">${d.lf||'—'}</span></div>`;})
+    .on('mousemove',e=>{tip.style.left=Math.min(e.clientX+14,window.innerWidth-260)+'px';tip.style.top=Math.min(e.clientY-8,window.innerHeight-160)+'px';}).on('mouseleave',()=>tip.style.display='none');
+  const sim=d3.forceSimulation(nodes).force('link',d3.forceLink(links).distance(d=>85+(1-d.pct/100)*55).strength(.6)).force('charge',d3.forceManyBody().strength(d=>d.kind==='issuer'?-440:-155)).force('center',d3.forceCenter(W/2,H/2)).force('collision',d3.forceCollide(d=>d.kind==='issuer'?34:20)).on('tick',()=>{link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);node.attr('transform',d=>`translate(${d.x},${d.y})`);});
+  document.getElementById('relMapLegend').innerHTML=`<div class="sh-legend-item"><div class="sh-legend-dot" style="background:#d4a853"></div>Stock</div>${Object.entries(TC).filter(([k])=>k).map(([t,c])=>`<div class="sh-legend-item"><div class="sh-legend-dot" style="background:${c}"></div>${t}</div>`).join('')}<div class="sh-legend-item" style="margin-left:12px"><span style="display:inline-block;width:22px;height:2px;background:#7ab87a;vertical-align:middle;margin-right:6px"></span>LOCAL</div><div class="sh-legend-item"><span style="display:inline-block;width:22px;height:2px;background:#ff6b35;vertical-align:middle;margin-right:6px"></span>FOREIGN</div><div class="sh-legend-item" style="color:#907e6e;font-size:9px;margin-left:auto">capped ${GRAPH_CAP} · LINE WEIGHT=%</div>`;
+}
+
+// ── SHAREHOLDERS MAP ─────────────────────────────────────
+function renderShareholderMap(){
+  const wrap=document.getElementById('shMapWrap');wrap.innerHTML='';
+  const tip=document.getElementById('shTooltip');
+  let data=document.getElementById('shStockFilter').value==='all'?filtered:filtered.filter(r=>r.code===document.getElementById('shStockFilter').value);
+  if(data.length>GRAPH_CAP) data=[...data].sort((a,b)=>b.pct-a.pct).slice(0,GRAPH_CAP);
+  if(data.length<2){wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);font-family:Space Mono,monospace;font-size:12px">SELECT A STOCK WITH MULTIPLE SHAREHOLDERS</div>';return;}
+  const W=wrap.clientWidth||900,H=440;
+  const iMap={};
+  data.forEach(r=>{if(!iMap[r.investor])iMap[r.investor]={id:r.investor,label:r.investor.length>21?r.investor.slice(0,21)+'…':r.investor,fullName:r.investor,type:r.type,lf:r.lf,nat:r.nationality||r.domicile,stocks:[],totalPct:0};iMap[r.investor].stocks.push({code:r.code,pct:r.pct});iMap[r.investor].totalPct+=r.pct;});
+  const codes=[...new Set(data.map(r=>r.code))];
+  const sNodes=codes.map(c=>({id:'__s__'+c,label:c,kind:'stock',issuer:data.find(r=>r.code===c)?.issuer||c,count:data.filter(r=>r.code===c).length}));
+  const allN=[...Object.values(iMap).map(n=>({...n,kind:'investor'})),...sNodes];
+  const nByKey={};allN.forEach((n,i)=>nByKey[n.id]=i);
+  const memL=data.map(r=>({source:nByKey[r.investor],target:nByKey['__s__'+r.code],pct:r.pct,code:r.code,kind:'mem'})).filter(l=>l.source!=null&&l.target!=null);
+  const coM={};
+  codes.forEach(c=>{const h=data.filter(r=>r.code===c);for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++){const k=[h[i].investor,h[j].investor].sort().join('||');if(!coM[k])coM[k]={si:nByKey[h[i].investor],ti:nByKey[h[j].investor],w:0,codes:[]};coM[k].w+=(h[i].pct+h[j].pct)/2;coM[k].codes.push(c);}});
+  const coL=Object.values(coM).filter(l=>l.si!=null&&l.ti!=null).map(l=>({source:l.si,target:l.ti,weight:l.w,codes:l.codes,kind:'co'}));
+  const allL=[...memL,...coL];
+  const svg=d3.select(wrap).append('svg').attr('width',W).attr('height',H);
+  const g=svg.append('g');
+  shZoom=d3.zoom().scaleExtent([0.2,5]).on('zoom',e=>g.attr('transform',e.transform));svg.call(shZoom);
+  const coEl=g.append('g').selectAll('line').data(allL.filter(l=>l.kind==='co')).join('line').attr('stroke','rgba(155,125,90,.35)').attr('stroke-width',d=>Math.max(.5,Math.min(4,d.weight/17))).attr('stroke-dasharray','5,3');
+  const memEl=g.append('g').selectAll('line').data(allL.filter(l=>l.kind==='mem')).join('line').attr('stroke',d=>(allN[d.source]?.lf==='LOCAL'?'rgba(122,184,122,.4)':allN[d.source]?.lf==='FOREIGN'?'rgba(196,122,58,.4)':'rgba(100,116,139,.3)')).attr('stroke-width',d=>Math.max(.7,Math.min(5,d.pct/15)));
+  const drag=d3.drag().on('start',(e,d)=>{if(!e.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;});
+  const nodeEl=g.append('g').selectAll('g').data(allN).join('g').call(drag);
+  nodeEl.append('circle').attr('r',d=>d.kind==='stock'?25:Math.max(10,Math.min(22,9+(d.totalPct||0)/7))).attr('fill',d=>d.kind==='stock'?'rgba(245,158,11,.15)':(TC[d.type]||'#907e6e')+'22').attr('stroke',d=>d.kind==='stock'?'#d4a853':(TC[d.type]||'#907e6e')).attr('stroke-width',d=>d.kind==='stock'?2.5:1.5).style('cursor','pointer');
+  nodeEl.append('text').attr('dy',4).attr('text-anchor','middle').attr('fill',d=>d.kind==='stock'?'#cb912f':(TC[d.type]||'#5a5a5a')).attr('font-size',d=>d.kind==='stock'?11:8).attr('font-weight','700').attr('font-family',"'IBM Plex Mono',monospace").attr('pointer-events','none').text(d=>d.kind==='stock'?d.label:(d.type||'?'));
+  nodeEl.append('text').attr('dy',d=>d.kind==='stock'?41:29).attr('text-anchor','middle').attr('fill',d=>d.kind==='stock'?'#cb912f':'#6b6b6b').attr('font-size',d=>d.kind==='stock'?10:9).attr('pointer-events','none').text(d=>d.label);
+  nodeEl.on('mouseenter',(e,d)=>{tip.style.display='block';if(d.kind==='stock')tip.innerHTML=`<div style="color:#d4a853;font-weight:700;margin-bottom:5px">${d.label}</div><div style="color:#907e6e;font-size:10px;margin-bottom:3px">${d.issuer}</div><div>Shareholders: <span style="color:#da8a4e">${d.count}</span></div>`;else tip.innerHTML=`<div style="color:${TC[d.type]||'#907e6e'};font-weight:700;margin-bottom:5px">${d.fullName}</div><div>Type: <span style="color:#37352f">${d.type||'—'}</span> · L/F: <span style="color:#37352f">${d.lf||'—'}</span></div><div>Stocks: <span style="color:#da8a4e">${(d.stocks||[]).map(s=>s.code+'('+s.pct.toFixed(1)+'%)').join(', ')}</span></div><div>Total: <span style="color:#da8a4e">${(d.totalPct||0).toFixed(2)}%</span></div>`;})
+    .on('mousemove',e=>{tip.style.left=Math.min(e.clientX+14,window.innerWidth-260)+'px';tip.style.top=Math.min(e.clientY-8,window.innerHeight-160)+'px';}).on('mouseleave',()=>tip.style.display='none');
+  coEl.on('mouseenter',(e,d)=>{tip.style.display='block';tip.innerHTML=`<div style="color:#9b7d5a;font-weight:700;margin-bottom:5px">CO-INVESTMENT</div><div style="font-size:10px;color:#907e6e;margin-bottom:4px">${allN[d.source]?.fullName||''} ↔ ${allN[d.target]?.fullName||''}</div><div>Shared: <span style="color:#9b7d5a">${d.codes?.join(', ')}</span></div><div>Weight: <span style="color:#37352f">${(d.weight||0).toFixed(1)}%</span></div>`;})
+    .on('mousemove',e=>{tip.style.left=Math.min(e.clientX+14,window.innerWidth-260)+'px';tip.style.top=Math.min(e.clientY-8,window.innerHeight-160)+'px';}).on('mouseleave',()=>tip.style.display='none');
+  const sim=d3.forceSimulation(allN).force('link',d3.forceLink(allL).distance(d=>d.kind==='co'?115:88).strength(d=>d.kind==='mem'?.7:.18)).force('charge',d3.forceManyBody().strength(d=>d.kind==='stock'?-540:-185)).force('center',d3.forceCenter(W/2,H/2)).force('collision',d3.forceCollide(d=>d.kind==='stock'?37:23)).on('tick',()=>{[coEl,memEl].forEach(el=>el.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y));nodeEl.attr('transform',d=>`translate(${d.x},${d.y})`);});
+  document.getElementById('shLegend').innerHTML=`<div class="sh-legend-item"><div class="sh-legend-dot" style="background:#d4a853"></div>Stock</div>${Object.entries(TC).filter(([k])=>k).map(([t,c])=>`<div class="sh-legend-item"><div class="sh-legend-dot" style="background:${c}"></div>${t}</div>`).join('')}<div class="sh-legend-item" style="margin-left:12px"><span style="display:inline-block;width:22px;border-top:2px dashed #a78bfa;vertical-align:middle;margin-right:6px"></span>Co-invest</div><div class="sh-legend-item" style="color:#907e6e;font-size:9px;margin-left:auto">NODE SIZE=total % · capped ${GRAPH_CAP}</div>`;
+}
+
+// ── RENDER ALL ───────────────────────────────────────────
+function renderAll(){
+  renderKPIs(); renderTicker(); renderTable(); renderPagination();
+  renderTypeChart(); renderNatPanel(); renderHoldingsChart();
+  renderTopInvestors(); renderLFChart(); renderStockChart();
+  renderBubbleMap(); renderRelMap(); renderShareholderMap();
+}
+
+// ── BOOT ─────────────────────────────────────────────────
+fetchJSON();
+</script>
+</body>
+</html>
